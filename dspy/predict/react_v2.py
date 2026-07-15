@@ -26,6 +26,16 @@ _RESERVED_OUTPUT_NAMES = frozenset({"history", "termination_reason"})
 @experimental
 class ReActV2(Module):
     def __init__(self, signature: type[Signature], tools: list[Callable | Tool], max_iters: int = 20):
+        """
+        Args:
+            signature: The signature of the module, which defines the input and output of the agent.
+            tools: A list of functions, callable objects, or `dspy.Tool` instances.
+            max_iters: The maximum number of iterations to run. Defaults to 20.
+
+        Raises:
+            ValueError: If a signature output field reuses a name reserved by ReActV2 for framework
+                metadata (`history`, `termination_reason`). Rename the colliding output field(s).
+        """
         super().__init__()
         self.signature = ensure_signature(signature)
         self.max_iters = max_iters

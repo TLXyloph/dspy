@@ -31,6 +31,10 @@ class ReAct(Module):
             tools (list[Callable]): A list of functions, callable objects, or `dspy.Tool` instances.
             max_iters (Optional[int]): The maximum number of iterations to run. Defaults to 10.
 
+        Raises:
+            ValueError: If a signature output field reuses a name reserved by ReAct for framework
+                metadata (`trajectory`). Rename the colliding output field(s).
+
         Examples:
 
         ```python

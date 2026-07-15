@@ -34,6 +34,10 @@ class CodeAct(ReAct, ProgramOfThought):
             max_iters (int): The maximum number of iterations to generate the answer.
             interpreter_factory: Zero-argument callable that creates an interpreter for each forward pass. The
                 callable may be invoked concurrently, and DSPy shuts down each interpreter it returns.
+
+        Raises:
+            ValueError: If a signature output field reuses a name reserved by CodeAct for framework
+                metadata (`trajectory`). Rename the colliding output field(s).
         Examples:
             ```python
             from dspy.predict import CodeAct
