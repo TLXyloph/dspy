@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from dspy.signatures.signature import Signature
 
+# Output-field names ReActV2 injects into the returned Prediction. A user signature
+# whose output field reuses one of these would collide at Prediction construction.
+_RESERVED_OUTPUT_NAMES = frozenset({"history", "termination_reason"})
+
 
 @experimental
 class ReActV2(Module):
@@ -25,6 +29,14 @@ class ReActV2(Module):
         super().__init__()
         self.signature = ensure_signature(signature)
         self.max_iters = max_iters
+
+        reserved_collisions = _RESERVED_OUTPUT_NAMES.intersection(self.signature.output_fields)
+        if reserved_collisions:
+            names = ", ".join(sorted(reserved_collisions))
+            raise ValueError(
+                f"Output field(s) {names} are reserved by ReActV2 for framework metadata and cannot be used as "
+                "signature output fields. Rename the output field(s)."
+            )
 
         user_tools = [tool if isinstance(tool, Tool) else Tool(tool) for tool in tools]
         self.tools = {tool.name: tool for tool in user_tools}
@@ -44,10 +56,7 @@ class ReActV2(Module):
                 raise ValueError(f"Missing required final output field(s): {', '.join(missing)}")
             return {name: kwargs[name] for name in output_names}
 
-        args = {
-            name: _json_schema_for_annotation(field.annotation)
-            for name, field in output_fields.items()
-        }
+        args = {name: _json_schema_for_annotation(field.annotation) for name, field in output_fields.items()}
         arg_types = {name: field.annotation for name, field in output_fields.items()}
         return Tool(
             submit,

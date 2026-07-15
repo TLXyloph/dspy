@@ -25,7 +25,6 @@ def test_tool_observation_preserves_custom_type():
     def make_images():
         return dspy.Image("https://example.com/test.png"), dspy.Image(Image.new("RGB", (100, 100), "red"))
 
-
     adapter = SpyChatAdapter()
     lm = DummyLM(
         [
@@ -471,3 +470,8 @@ async def test_async_error_retry():
     for i in range(2):
         obs = traj[f"observation_{i}"]
         assert re.search(r"\btool error\b", obs), f"unexpected observation_{i!r}: {obs}"
+
+
+def test_react_rejects_reserved_output_field_name():
+    with pytest.raises(ValueError, match="trajectory"):
+        dspy.ReAct("question -> trajectory", tools=[])

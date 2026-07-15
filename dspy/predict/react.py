@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from dspy.signatures.signature import Signature
 
+# Output-field names ReAct injects into the returned Prediction. A user signature
+# whose output field reuses one of these would collide at Prediction construction.
+_RESERVED_OUTPUT_NAMES = frozenset({"trajectory"})
+
 
 class ReAct(Module):
     def __init__(self, signature: type["Signature"], tools: list[Callable], max_iters: int = 20):
@@ -40,6 +44,14 @@ class ReAct(Module):
         super().__init__()
         self.signature = signature = ensure_signature(signature)
         self.max_iters = max_iters
+
+        reserved_collisions = _RESERVED_OUTPUT_NAMES.intersection(signature.output_fields)
+        if reserved_collisions:
+            names = ", ".join(sorted(reserved_collisions))
+            raise ValueError(
+                f"Output field(s) {names} are reserved by ReAct for framework metadata and cannot be used as "
+                "signature output fields. Rename the output field(s)."
+            )
 
         tools = [t if isinstance(t, Tool) else Tool(t) for t in tools]
         tools = {tool.name: tool for tool in tools}
