@@ -7,10 +7,12 @@ build the optimizer via ``__new__`` and set ``self.metric`` directly, since
 """
 
 import threading
+from unittest import mock
 
 import pytest
 
 import dspy
+from dspy.teleprompt import avatar_optimizer
 from dspy.teleprompt.avatar_optimizer import AvatarOptimizer
 from dspy.utils.callback import ACTIVE_CALL_ID, BaseCallback
 from dspy.utils.dummies import DummyLM
@@ -137,6 +139,37 @@ def test_evaluation_tolerates_more_failures_than_default_max_errors():
     assert avg == 0.0
     assert len(results) == n
     assert all(prediction is None and score == 0 for _, prediction, score in results)
+
+
+def test_evaluator_configures_executor_for_at_most_once():
+    """The executor is configured to run each actor/metric exactly once per example.
+
+    Issue #10053 requires preserving Avatar's at-most-once contract, so
+    ``thread_safe_evaluator`` must disable ParallelExecutor's straggler resubmission
+    (``straggler_limit=0`` -> a slow final example is never re-submitted, avoiding duplicate
+    actor/LM calls) and keep per-example failures from aborting the run
+    (``max_errors`` above the devset size). This asserts the wiring directly, since triggering
+    an actual straggler timeout in a unit test is not practical.
+    """
+    optimizer = _make_optimizer(_match_metric)
+    devset = _devset(5)
+    actor = ContextReadingActor()
+
+    captured = {}
+    real_executor_cls = avatar_optimizer.ParallelExecutor
+
+    def _recording_executor(**kwargs):
+        captured.update(kwargs)
+        return real_executor_cls(**kwargs)
+
+    with dspy.context(lm=DummyLM([{"answer": "ok"}])):
+        with mock.patch.object(avatar_optimizer, "ParallelExecutor", _recording_executor):
+            avg, _ = optimizer.thread_safe_evaluator(devset, actor, return_outputs=True, num_threads=4)
+
+    assert captured["straggler_limit"] == 0
+    assert captured["max_errors"] > len(devset)
+    # Sanity: the evaluation still ran correctly through the real executor.
+    assert avg == 1.0
 
 
 def test_callback_handlers_fire_inside_worker_threads():

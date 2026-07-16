@@ -97,8 +97,12 @@ class AvatarOptimizer(Teleprompter):
 
         executor = ParallelExecutor(
             num_threads=num_threads,
+            # Never abort on per-example failures; failing examples are scored 0 (issue #10053).
             max_errors=len(devset) + 1,
             compare_results=True,
+            # Disable straggler resubmission to preserve Avatar's at-most-once contract:
+            # each actor/metric runs exactly once per example, with no duplicate LM calls.
+            straggler_limit=0,
         )
 
         def process_example(example):
