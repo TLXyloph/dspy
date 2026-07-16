@@ -97,7 +97,7 @@ class AvatarOptimizer(Teleprompter):
 
         executor = ParallelExecutor(
             num_threads=num_threads,
-            max_errors=dspy.settings.max_errors,
+            max_errors=len(devset) + 1,
             compare_results=True,
         )
 

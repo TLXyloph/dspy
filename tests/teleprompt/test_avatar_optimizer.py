@@ -49,6 +49,13 @@ class FailingActor(dspy.Module):
         return dspy.Prediction(answer="ok")
 
 
+class AlwaysFailingActor(dspy.Module):
+    """Actor that raises for every input."""
+
+    def forward(self, **kwargs):
+        raise RuntimeError("boom")
+
+
 def _match_metric(example, prediction):
     return 1.0 if getattr(prediction, "answer", None) == "ok" else 0.0
 
@@ -109,6 +116,27 @@ def test_failing_example_scores_zero_and_counts_toward_average():
     _, prediction, score = failed[0]
     assert prediction is None
     assert score == 0
+
+
+def test_evaluation_tolerates_more_failures_than_default_max_errors():
+    """Every failing example scores 0 without aborting, even past dspy.settings.max_errors.
+
+    The legacy evaluator swallowed every per-example exception, so an unlimited number of
+    failures never cancelled the run. Regression guard: a devset with far more failures than
+    the default max_errors (10) must still complete with an all-zero average instead of
+    raising "Execution cancelled due to errors or interruption.".
+    """
+    optimizer = _make_optimizer(_match_metric)
+    n = dspy.settings.max_errors + 5
+    devset = _devset(n)
+    actor = AlwaysFailingActor()
+
+    with dspy.context(lm=DummyLM([{"answer": "ok"}])):
+        avg, results = optimizer.thread_safe_evaluator(devset, actor, return_outputs=True, num_threads=4)
+
+    assert avg == 0.0
+    assert len(results) == n
+    assert all(prediction is None and score == 0 for _, prediction, score in results)
 
 
 def test_callback_handlers_fire_inside_worker_threads():
