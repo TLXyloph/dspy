@@ -71,6 +71,15 @@ CodeAct operates in an iterative manner:
 
 ## ⚠️ Limitations
 
+### Reserved output field names cannot be used
+
+`trajectory` is reserved by CodeAct for framework metadata and cannot be used as a signature output field. Passing a signature whose output reuses this name raises a `ValueError`.
+
+```python
+# ❌ NG
+dspy.CodeAct("question -> trajectory", tools=[])
+```
+
 ### Only accepts pure functions as tools (no callable objects)
 
 The following example does not work due to the usage of a callable object.

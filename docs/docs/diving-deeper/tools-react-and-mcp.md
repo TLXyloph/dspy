@@ -42,7 +42,7 @@ A raised exception from a tool is caught inside `forward` and recorded as `obser
 
 ### 9. A separate extractor module produces the declared outputs
 
-After the loop ends, ReAct hands the trajectory to a `dspy.ChainOfThought` over a fallback signature that includes the original output fields plus a `trajectory` input. The extractor’s job is to read the trajectory and produce the signature’s declared outputs in their correct types. Decoupling navigation (the loop) from extraction (the typed answer) makes both halves easier to optimize and easier to debug.
+After the loop ends, ReAct hands the trajectory to a `dspy.ChainOfThought` over a fallback signature that includes the original output fields plus a `trajectory` input. The extractor’s job is to read the trajectory and produce the signature’s declared outputs in their correct types. Decoupling navigation (the loop) from extraction (the typed answer) makes both halves easier to optimize and easier to debug. Because ReAct injects `trajectory` into this signature, it is a reserved output name — a signature whose own output field is named `trajectory` is rejected with a `ValueError` at construction.
 
 ### 10. Trajectory truncation drops the oldest tool call on context overflow
 

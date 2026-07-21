@@ -5,12 +5,13 @@ from typing import Callable
 import dspy
 from dspy.adapters.types.tool import Tool
 from dspy.predict.program_of_thought import ProgramOfThought
-from dspy.predict.react import ReAct
+from dspy.predict.react import _RESERVED_OUTPUT_NAMES, ReAct
 from dspy.primitives.code_interpreter import CodeInterpreter, _validate_interpreter_factory
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.signatures.signature import Signature, ensure_signature
 
 logger = logging.getLogger(__name__)
+
 
 class CodeAct(ReAct, ProgramOfThought):
     """
@@ -33,6 +34,10 @@ class CodeAct(ReAct, ProgramOfThought):
             max_iters (int): The maximum number of iterations to generate the answer.
             interpreter_factory: Zero-argument callable that creates an interpreter for each forward pass. The
                 callable may be invoked concurrently, and DSPy shuts down each interpreter it returns.
+
+        Raises:
+            ValueError: If a signature output field reuses a name reserved by CodeAct for framework
+                metadata (`trajectory`). Rename the colliding output field(s).
         Examples:
             ```python
             from dspy.predict import CodeAct
@@ -48,12 +53,18 @@ class CodeAct(ReAct, ProgramOfThought):
         _validate_interpreter_factory(interpreter_factory)
         self.signature = ensure_signature(signature)
         self.max_iters = max_iters
+
+        reserved_collisions = _RESERVED_OUTPUT_NAMES.intersection(self.signature.output_fields)
+        if reserved_collisions:
+            names = ", ".join(sorted(reserved_collisions))
+            raise ValueError(
+                f"Output field(s) {names} are reserved by CodeAct for framework metadata and cannot be used as "
+                "signature output fields. Rename the output field(s)."
+            )
         self.history = []
 
         tools = [t if isinstance(t, Tool) else Tool(t) for t in tools]
-        if any(
-            not inspect.isfunction(tool.func) for tool in tools
-        ):
+        if any(not inspect.isfunction(tool.func) for tool in tools):
             raise ValueError("CodeAct only accepts functions and not callable objects.")
         tools = {tool.name: tool for tool in tools}
 
@@ -62,7 +73,13 @@ class CodeAct(ReAct, ProgramOfThought):
         codeact_signature = (
             dspy.Signature({**self.signature.input_fields}, "\n".join(instructions))
             .append("trajectory", dspy.InputField(), type_=str)
-            .append("generated_code", dspy.OutputField(desc="Python code that when executed, produces output relevant to answering the question"), type_=str)
+            .append(
+                "generated_code",
+                dspy.OutputField(
+                    desc="Python code that when executed, produces output relevant to answering the question"
+                ),
+                type_=str,
+            )
             .append("finished", dspy.OutputField(desc="a boolean flag to determine if the process is done"), type_=bool)
         )
 
